@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Word Cloud | Apache ECharts</title>
-  <meta name="description" content="Beautiful interactive word cloud powered by Apache ECharts using hardcoded JS data.">
+  <title>Swaminarayan Names | Word Cloud</title>
+  <meta name="description" content="A word cloud of names from Swaminarayan Sampraday sources.">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +45,7 @@
           ECharts v5.5.0
         </span>
         <span class="badge" id="source-badge">
-          Loaded from <code>data.js</code>
+          Loaded from <code>word-cloud-data/swaminarayan-names.json</code>
         </span>
       </div>
     </header>
@@ -57,9 +57,7 @@
         <div class="control-item">
           <label class="control-label" for="preset-select">Dataset Preset</label>
           <select id="preset-select" class="select-input">
-            <option value="babyShower" selected>🍼 Baby Shower Celebration</option>
-            <option value="techTrends">🚀 Tech &amp; Innovation</option>
-            <option value="festive">✨ Happy Celebrations</option>
+            <option value="babyShower" selected>🙏 Swaminarayan Spiritual Names</option>
           </select>
         </div>
 
@@ -67,8 +65,8 @@
         <div class="control-item">
           <label class="control-label" for="shape-select">Cloud Shape</label>
           <select id="shape-select" class="select-input">
-            <option value="circle">⚪ Circle</option>
-            <option value="cardioid" selected>❤️ Heart / Cardioid</option>
+            <option value="circle" selected>⚪ Circle</option>
+            <option value="cardioid">❤️ Heart / Cardioid</option>
             <option value="diamond">💠 Diamond</option>
             <option value="star">⭐ Star</option>
             <option value="triangle">🔺 Triangle</option>
@@ -151,7 +149,7 @@
       <div class="visual-topbar">
         <div class="visual-meta">
           <span class="meta-pill">
-            Words: <strong id="meta-count">0</strong>
+            On sheet: <strong id="meta-placed">0</strong> / <strong id="meta-count">0</strong>
           </span>
           <span class="meta-pill">
             Top Word: <strong id="meta-top">-</strong>
@@ -186,7 +184,7 @@
     </main>
 
     <footer class="app-footer">
-      Apache ECharts Word Cloud &bull; Loaded from <code>data.js</code>
+      Apache ECharts Word Cloud &bull; Loaded from <code>word-cloud-data/swaminarayan-names.json</code>
     </footer>
   </div>
 

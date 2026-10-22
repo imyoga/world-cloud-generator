@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnPrint = document.getElementById('btn-print');
   const btnEdit = document.getElementById('btn-edit');
   const metaCount = document.getElementById('meta-count');
+  const metaPlaced = document.getElementById('meta-placed');
   const metaTop = document.getElementById('meta-top');
   const metaRatioBadge = document.getElementById('meta-ratio-badge');
+  const sourceBadge = document.getElementById('source-badge');
   const inspectorWord = document.getElementById('inspector-word');
   const inspectorWeight = document.getElementById('inspector-weight');
   const overlay = document.getElementById('chart-overlay');
@@ -39,8 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // State
   // Default to hardcoded data from data.js
-  let currentData = Array.isArray(WORD_CLOUD_DATA) ? [...WORD_CLOUD_DATA] : [];
-  let currentShape = shapeSelect.value || 'cardioid';
+  let sourceData = Array.isArray(WORD_CLOUD_DATA) ? [...WORD_CLOUD_DATA] : [];
+  let currentData = [...sourceData];
+  let currentShape = shapeSelect.value || 'circle';
   let currentPalette = paletteSelect.value || 'cottonCandy';
   let currentRotation = rotationSelect.value || 'dynamic';
   let currentOrientation = pageRatioSelect ? pageRatioSelect.value : 'portrait';
@@ -76,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   function updateMetadata(data) {
     if (!data || data.length === 0) {
+      if (metaPlaced) metaPlaced.textContent = '0';
       metaCount.textContent = '0';
       metaTop.textContent = '-';
       return;
@@ -85,20 +89,119 @@ document.addEventListener('DOMContentLoaded', () => {
     metaTop.textContent = `${sorted[0].name} (${sorted[0].value})`;
   }
 
+  /** Words the layout actually drew (many entries can fail to fit). */
+  function countPlacedWords() {
+    const series = myChart.getModel().getSeriesByIndex(0);
+    if (!series) return 0;
+    const data = series.getData();
+    let placed = 0;
+    for (let i = 0; i < data.count(); i++) {
+      if (data.getItemGraphicEl(i)) placed++;
+    }
+    return placed;
+  }
+
+  let renderGeneration = 0;
+
   /**
-   * Render word cloud with current options
+   * Wait until the async word-cloud layout stops changing.
+   * @returns {Promise<number>} count of placed words when stable
    */
-  function renderChart() {
-    overlay.classList.add('visible');
+  function waitForLayoutStable(activeGeneration) {
+    return new Promise((resolve) => {
+      const startedAt = Date.now();
+      let lastPlaced = -1;
+      let stableTicks = 0;
 
-    const rotation = getRotationConfig(currentRotation);
+      const poll = () => {
+        if (activeGeneration !== renderGeneration) {
+          resolve(countPlacedWords());
+          return;
+        }
+        const placed = countPlacedWords();
+        const total = currentData.length;
+        if (metaPlaced) metaPlaced.textContent = placed.toString();
 
-    // Calculate font size range based on container width
-    const containerWidth = chartDom.clientWidth || 520;
-    const minSize = containerWidth < 450 ? 12 : 15;
-    const maxSize = containerWidth < 450 ? 42 : 56;
+        if (placed === lastPlaced) {
+          stableTicks++;
+        } else {
+          stableTicks = 0;
+          lastPlaced = placed;
+        }
 
-    const option = {
+        const layoutDone =
+          stableTicks >= 4 || placed === total || Date.now() - startedAt > 8000;
+        if (!layoutDone) {
+          setTimeout(poll, 80);
+          return;
+        }
+        resolve(placed);
+      };
+
+      setTimeout(poll, 50);
+    });
+  }
+
+  function getFontSizeRange(containerWidth, wordCount) {
+    let minSize = containerWidth < 450 ? 22 : 26;
+    let maxSize = containerWidth < 450 ? 42 : 56;
+    if (wordCount > 200) {
+      minSize = containerWidth < 450 ? 9 : 10;
+      maxSize = containerWidth < 450 ? 22 : 26;
+    } else if (wordCount > 120) {
+      minSize = containerWidth < 450 ? 12 : 14;
+      maxSize = containerWidth < 450 ? 28 : 32;
+    } else if (wordCount > 60) {
+      minSize = containerWidth < 450 ? 16 : 18;
+      maxSize = containerWidth < 450 ? 34 : 40;
+    } else if (wordCount > 35) {
+      minSize = containerWidth < 450 ? 14 : 16;
+      maxSize = containerWidth < 450 ? 30 : 36;
+    }
+    return { minSize, maxSize };
+  }
+
+  function getGridSize(wordCount, attemptIndex = 0) {
+    let size = 4;
+    if (wordCount > 200) size = 2;
+    else if (wordCount > 100) size = 3;
+    else if (wordCount > 40) size = 3;
+    return Math.max(2, size - Math.floor(attemptIndex / 2));
+  }
+
+  function scaleFontRange(range, scale) {
+    const minSize = Math.max(6, Math.round(range.minSize * scale));
+    const maxSize = Math.max(minSize + 4, Math.round(range.maxSize * scale));
+    return { minSize, maxSize };
+  }
+
+  function buildChartData(minSize, maxSize) {
+    const sortedValues = currentData
+      .map((entry) => (Number.isFinite(entry.value) ? entry.value : 0))
+      .sort((a, b) => a - b);
+    const minimumValue = sortedValues[0] || 0;
+    const maximumValue = sortedValues[sortedValues.length - 1] || 0;
+    const largestRegularValue = sortedValues[sortedValues.length - 2] ?? minimumValue;
+    const regularSizeRange = Math.max(0, maxSize - minSize - 8);
+    const getWordFontSize = (value) => {
+      if (value === maximumValue && maximumValue > largestRegularValue) return maxSize;
+      if (largestRegularValue <= minimumValue) return maxSize;
+      const normalized = Math.min(
+        1,
+        Math.max(0, (value - minimumValue) / (largestRegularValue - minimumValue))
+      );
+      return minSize + normalized * regularSizeRange;
+    };
+    const span = Math.max(1, maxSize - minSize);
+    return currentData.map((entry) => ({
+      ...entry,
+      originalValue: entry.value,
+      value: ((getWordFontSize(entry.value) - minSize) / span) * 100
+    }));
+  }
+
+  function buildChartOption({ minSize, maxSize, gridSize, rotation, shape }) {
+    return {
       backgroundColor: 'transparent',
       tooltip: {
         show: true,
@@ -118,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
               ${params.name}
             </div>
             <div style="font-size: 12px; color: #64748b;">
-              Weight / Frequency: <strong style="color: #ec4899;">${params.value}</strong>
+          Weight / Frequency: <strong style="color: #ec4899;">${params.data.originalValue}</strong>
             </div>
           `;
         }
@@ -126,20 +229,20 @@ document.addEventListener('DOMContentLoaded', () => {
       series: [
         {
           type: 'wordCloud',
-          shape: currentShape,
+          shape,
           keepAspect: false,
           left: 'center',
           top: 'center',
-          width: '90%',
-          height: '90%',
+          width: '98%',
+          height: '98%',
           right: null,
           bottom: null,
           sizeRange: [minSize, maxSize],
           rotationRange: rotation.rotationRange,
           rotationStep: rotation.rotationStep,
-          gridSize: 8,
+          gridSize,
           drawOutOfBound: false,
-          layoutAnimation: true,
+          layoutAnimation: false,
           shrinkToFit: true,
           textStyle: {
             fontFamily: 'Outfit, Inter, sans-serif',
@@ -155,31 +258,73 @@ document.addEventListener('DOMContentLoaded', () => {
               textShadowColor: 'rgba(0, 0, 0, 0.25)'
             }
           },
-          data: currentData
+          data: buildChartData(minSize, maxSize)
         }
       ]
     };
+  }
 
-    myChart.setOption(option, true);
+  /**
+   * Render word cloud; retries with smaller type / denser grid until every name is placed.
+   */
+  async function renderChart() {
+    const activeGeneration = ++renderGeneration;
+    overlay.classList.add('visible');
     updateMetadata(currentData);
+    if (metaPlaced) metaPlaced.textContent = '…';
 
-    setTimeout(() => {
-      overlay.classList.remove('visible');
-    }, 280);
+    const containerWidth = chartDom.clientWidth || 520;
+    const baseRange = getFontSizeRange(containerWidth, currentData.length);
+    const total = currentData.length;
+    const maxAttempts = 12;
+    let scale = 1;
+    let placed = 0;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (activeGeneration !== renderGeneration) return;
+
+      const { minSize, maxSize } = scaleFontRange(baseRange, scale);
+      const gridSize = getGridSize(total, attempt);
+      const useHorizontal = attempt >= 2;
+      const rotation = useHorizontal
+        ? getRotationConfig('horizontal')
+        : getRotationConfig(currentRotation);
+      const shape = attempt >= 5 ? 'square' : currentShape;
+
+      myChart.setOption(
+        buildChartOption({ minSize, maxSize, gridSize, rotation, shape }),
+        true
+      );
+
+      placed = await waitForLayoutStable(activeGeneration);
+      if (activeGeneration !== renderGeneration) return;
+
+      if (total === 0 || placed >= total) break;
+      scale *= 0.86;
+    }
+
+    if (metaPlaced) metaPlaced.textContent = placed.toString();
+    if (total > 0 && placed < total) {
+      console.warn(
+        `Word cloud placed ${placed} of ${total} names after fit retries; try horizontal rotation or a smaller dataset.`
+      );
+    }
+
+    overlay.classList.remove('visible');
   }
 
   // Handle Chart Word Interactions
   myChart.on('mouseover', function (params) {
     if (params && params.name) {
       inspectorWord.textContent = params.name;
-      inspectorWeight.innerHTML = `Weight: <strong>${params.value}</strong>`;
+      inspectorWeight.innerHTML = `Weight: <strong>${params.data.originalValue}</strong>`;
     }
   });
 
   myChart.on('click', function (params) {
     if (params && params.name) {
       inspectorWord.textContent = params.name;
-      inspectorWeight.innerHTML = `Weight: <strong>${params.value}</strong> (Clicked)`;
+      inspectorWeight.innerHTML = `Weight: <strong>${params.data.originalValue}</strong> (Clicked)`;
     }
   });
 
@@ -187,9 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
   presetSelect.addEventListener('change', (e) => {
     const key = e.target.value;
     if (THEMED_DATASETS && THEMED_DATASETS[key]) {
-      currentData = [...THEMED_DATASETS[key].data];
+      currentData = [...sourceData];
     } else {
-      currentData = [...WORD_CLOUD_DATA];
+      currentData = [...sourceData];
     }
     renderChart();
   });
@@ -287,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnResetData.addEventListener('click', () => {
-    currentData = Array.isArray(WORD_CLOUD_DATA) ? [...WORD_CLOUD_DATA] : [];
+    currentData = [...sourceData];
     dataJsonInput.value = JSON.stringify(currentData, null, 2);
   });
 
@@ -312,8 +457,32 @@ document.addEventListener('DOMContentLoaded', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       myChart.resize();
+      renderChart();
     }, 150);
   });
+
+  fetch('word-cloud-data/swaminarayan-names.json')
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Dataset request failed with status ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!Array.isArray(data) || !data.every((entry) =>
+        entry && typeof entry.name === 'string' && Number.isFinite(entry.value)
+      )) {
+        throw new Error('Dataset JSON must be an array of names and numeric values.');
+      }
+      sourceData = data;
+      currentData = [...sourceData];
+      if (sourceBadge) sourceBadge.innerHTML = 'Loaded from <code>word-cloud-data/swaminarayan-names.json</code>';
+      renderChart();
+    })
+    .catch((error) => {
+      console.error('Could not load the Swaminarayan names JSON:', error);
+      if (sourceBadge) sourceBadge.textContent = 'JSON unavailable; using fallback data';
+    });
 
   // Initial Render
   renderChart();
