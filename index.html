@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Word Cloud | Apache ECharts</title>
+  <meta name="description" content="Beautiful interactive word cloud powered by Apache ECharts using hardcoded JS data.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Apache ECharts & ECharts WordCloud Extension -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.1.0/dist/echarts-wordcloud.min.js"></script>
+</head>
+<body>
+  <!-- Ambient background lighting -->
+  <div class="ambient-blob blob-1"></div>
+  <div class="ambient-blob blob-2"></div>
+  <div class="ambient-blob blob-3"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-wrapper">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <div class="title-group">
+          <h1>Word Cloud Studio</h1>
+          <p>Powered by Apache ECharts &amp; Hardcoded JS Dataset</p>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <span class="badge">
+          <span class="badge-dot"></span>
+          ECharts v5.5.0
+        </span>
+        <span class="badge" id="source-badge">
+          Loaded from <code>data.js</code>
+        </span>
+      </div>
+    </header>
+
+    <!-- Toolbar Controls -->
+    <section class="toolbar-card">
+      <div class="controls-group">
+        <!-- Preset / Dataset -->
+        <div class="control-item">
+          <label class="control-label" for="preset-select">Dataset Preset</label>
+          <select id="preset-select" class="select-input">
+            <option value="babyShower" selected>🍼 Baby Shower Celebration</option>
+            <option value="techTrends">🚀 Tech &amp; Innovation</option>
+            <option value="festive">✨ Happy Celebrations</option>
+          </select>
+        </div>
+
+        <!-- Mask Shape -->
+        <div class="control-item">
+          <label class="control-label" for="shape-select">Cloud Shape</label>
+          <select id="shape-select" class="select-input">
+            <option value="circle">⚪ Circle</option>
+            <option value="cardioid" selected>❤️ Heart / Cardioid</option>
+            <option value="diamond">💠 Diamond</option>
+            <option value="star">⭐ Star</option>
+            <option value="triangle">🔺 Triangle</option>
+          </select>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="control-item">
+          <label class="control-label" for="palette-select">Color Theme</label>
+          <select id="palette-select" class="select-input">
+            <option value="cottonCandy" selected>🍬 Cotton Candy</option>
+            <option value="warmSunset">🌅 Sunset Glow</option>
+            <option value="oceanBreeze">🌊 Ocean Breeze</option>
+            <option value="neonVibrant">⚡ Neon Pulse</option>
+            <option value="royalEmerald">🌿 Royal Emerald</option>
+          </select>
+        </div>
+
+        <!-- Word Rotation -->
+        <div class="control-item">
+          <label class="control-label" for="rotation-select">Word Orientation</label>
+          <select id="rotation-select" class="select-input">
+            <option value="dynamic" selected>🔀 Dynamic (-45° to 90°)</option>
+            <option value="horizontal">↔️ Horizontal Only (0°)</option>
+            <option value="perpendicular">➕ Orthogonal (-90° / 0° / 90°)</option>
+          </select>
+        </div>
+
+        <!-- Page Aspect Ratio (Letter 8.5 x 11 in) -->
+        <div class="control-item">
+          <label class="control-label" for="page-ratio-select">Page Format (Print)</label>
+          <select id="page-ratio-select" class="select-input">
+            <option value="portrait" selected>📄 US Letter Portrait (8.5 × 11 in)</option>
+            <option value="landscape">📑 US Letter Landscape (11 × 8.5 in)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="btn-actions">
+        <button id="btn-shuffle" class="btn btn-secondary" title="Re-randomize word positions">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.29 7 12 12 20.71 7"/>
+            <line x1="12" y1="22" x2="12" y2="12"/>
+          </svg>
+          Shuffle
+        </button>
+
+        <button id="btn-edit" class="btn btn-secondary" title="View or edit hardcoded dataset">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+          </svg>
+          Edit Data
+        </button>
+
+        <button id="btn-print" class="btn btn-secondary" title="Print directly to standard Letter page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Sheet
+        </button>
+
+        <button id="btn-download" class="btn btn-primary" title="Export as 300 DPI Letter printable PNG">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Save Letter PNG
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Chart Card -->
+    <main class="visual-card">
+      <div class="visual-topbar">
+        <div class="visual-meta">
+          <span class="meta-pill">
+            Words: <strong id="meta-count">0</strong>
+          </span>
+          <span class="meta-pill">
+            Top Word: <strong id="meta-top">-</strong>
+          </span>
+          <span class="meta-pill" id="meta-ratio-badge">
+            Ratio: <strong>8.5 × 11 in (1.294:1)</strong>
+          </span>
+        </div>
+        <div class="visual-meta">
+          <span class="meta-pill" style="background: rgba(236, 72, 153, 0.1); color: var(--primary);">
+            Letter Page Printable
+          </span>
+        </div>
+      </div>
+
+      <!-- Centered Print Sheet Stage -->
+      <div class="chart-stage">
+        <!-- ECharts Container with 8.5:11 (1.294:1) aspect ratio -->
+        <div id="chart-container" class="letter-sheet portrait"></div>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div id="chart-overlay" class="chart-overlay">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Quick Word Inspector Footer -->
+      <div class="word-inspector">
+        <div>Selected: <span id="inspector-word" class="inspector-highlight">Hover over any word</span></div>
+        <div id="inspector-weight">Weight: -</div>
+      </div>
+    </main>
+
+    <footer class="app-footer">
+      Apache ECharts Word Cloud &bull; Loaded from <code>data.js</code>
+    </footer>
+  </div>
+
+  <!-- Data Editor Modal -->
+  <div id="data-modal" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Live Dataset Editor</h3>
+        <button id="modal-close" class="close-btn" aria-label="Close modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Edit or paste JSON array of <code>{ name: "Word", value: 50 }</code> objects:</p>
+        <textarea id="data-json-input" class="data-textarea" spellcheck="false"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-reset-data" class="btn btn-secondary">Reset to Hardcoded</button>
+        <button id="btn-apply-data" class="btn btn-primary">Apply &amp; Re-render</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hardcoded Data Script First -->
+  <script src="data.js"></script>
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
